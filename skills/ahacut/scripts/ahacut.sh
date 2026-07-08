@@ -145,6 +145,26 @@ cmd_wait() {
   echo "Timed out after ${timeout}s (job may still be running)." >&2; return 1
 }
 
+# download <job_id> [out.mp4]  — save the finished video to a LOCAL file (for delivery)
+# Many agent frameworks can only deliver a local file path, not a remote URL — use this
+# after the job is done, then hand the printed local path to your delivery step.
+cmd_download() {
+  local id="${1:-}" out="${2:-}"
+  [ -z "$id" ] && { echo "Usage: ahacut.sh download <job_id> [out.mp4]"; exit 1; }
+  local res status; res=$(api GET "/jobs/${id}")
+  status=$(printf '%s' "$res" | jget '.job.status')
+  [ "$status" != "done" ] && { echo "ERROR: job $id not done (status=${status:-?}); run: ahacut.sh wait $id" >&2; exit 1; }
+  # prefer the final video with original audio; fall back to the b-roll-only track
+  local url; url=$(printf '%s' "$res" | jget '.job.result.with_audio')
+  [ -z "$url" ] && url=$(printf '%s' "$res" | jget '.job.result.broll')
+  [ -z "$url" ] && { echo "ERROR: no video URL in result: $res" >&2; exit 1; }
+  [ -z "$out" ] && out="./ahacut-${id}.mp4"
+  echo "Downloading video → ${out}…" >&2
+  curl -sSL -o "$out" "$url"
+  # print the ABSOLUTE local path (stdout) so the caller can deliver it directly
+  ( cd "$(dirname "$out")" && printf '%s/%s\n' "$(pwd)" "$(basename "$out")" )
+}
+
 cmd_help() {
   cat <<'HELP'
 Ahacut CLI — timeline-synced motion-graphics b-roll from subtitles / script / audio
@@ -160,9 +180,10 @@ Generate (returns a job; poll with `wait`):
   generate-text <file|-> <secs>    Script + total length: AI segments & paces it
   generate-audio <file> [secs]     mp3/wav -> speech-to-text -> b-roll, original audio kept
 
-Track:
+Track & deliver:
   job <id>                         Job status + result URLs
   wait <id> [timeout]              Poll until done/failed (default 1800s)
+  download <id> [out.mp4]          Save finished video LOCALLY, prints local path (for delivery)
   list                             Recent jobs
 
 Env: AHACUT_API_KEY, AHACUT_API_BASE (default https://api.ahacut.com)
@@ -182,6 +203,7 @@ case "$command" in
   generate-srt)   cmd_generate_srt "$@" ;;
   generate-audio) cmd_generate_audio "$@" ;;
   wait)           cmd_wait "$@" ;;
+  download)       cmd_download "$@" ;;
   help|--help|-h) cmd_help ;;
   *)              echo "Unknown command: $command"; cmd_help; exit 1 ;;
 esac

@@ -46,13 +46,30 @@ login <key> | logout | status | limits | list
 generate-srt <file.srt>
 generate-text <file|-> <seconds>
 generate-audio <file> [seconds]
-job <id>                 # status + result download URLs
-wait <id> [timeout=1800] # poll until done/failed, prints the final job
+job <id>                    # status + result download URLs
+wait <id> [timeout=1800]    # poll until done/failed, prints the final job
+download <id> [out.mp4]     # save finished video LOCALLY, prints the local path
 ```
 
 All go through `${CLAUDE_SKILL_DIR}/scripts/ahacut.sh`. Output is JSON — read `.job.status`
 (`queued → authoring → render_ready → running → done|failed`) and, when `done`,
 `.job.result.with_audio` / `.job.result.broll` (signed download URLs) and `.job.charged_credits`.
+
+## Delivering the result (important)
+
+The result URLs are **remote signed links**. Most agent frameworks can only hand the user a
+**local file**, not a URL — so after the job is `done`, **download it to a local file first**,
+then deliver that path:
+
+```bash
+$S wait <job_id>
+LOCAL=$($S download <job_id>)     # saves the mp4 locally, prints its absolute path
+# now deliver "$LOCAL" via your normal file-delivery mechanism
+```
+
+Prefer `.with_audio` (b-roll + the original voiceover) over `.broll` (visuals only) — `download`
+picks `.with_audio` automatically when present. Do **not** pass a remote URL to a delivery tool
+that expects a local file (that yields an empty/failed artifact).
 
 ## Workflow patterns
 
