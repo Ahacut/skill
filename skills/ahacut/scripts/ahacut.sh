@@ -313,9 +313,13 @@ cmd_draft() {
     target=$(jy_drafts_dir)
     if [ -z "$target" ]; then
       echo "JianYing drafts directory not found on this machine — extracting to the current directory instead." >&2
-      echo "Move the ahacut_* folder into JianYing's drafts directory yourself:" >&2
+      echo "If JianYing isn't installed: get it at https://lv.ulikecam.com/ , open it once (first launch" >&2
+      echo "creates the drafts directory), then re-run this command." >&2
+      echo "Or move the ahacut_* folder into JianYing's drafts directory yourself:" >&2
       echo "  macOS:   ~/Movies/JianyingPro/User Data/Projects/com.lveditor.draft/" >&2
       echo "  Windows: %LOCALAPPDATA%\\JianyingPro\\User Data\\Projects\\com.lveditor.draft\\" >&2
+      echo "(The extracted folder also ships human-friendly installers: Install-Mac.command /" >&2
+      echo " Install-Windows.bat — double-click, for when a person finishes this by hand.)" >&2
       target="."; install=0
     fi
   fi

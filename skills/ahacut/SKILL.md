@@ -109,6 +109,12 @@ the timeline already laid out. Rules the command enforces (worth knowing):
 - If no local JianYing install is found, it extracts to the current directory and prints
   where to move the folder manually (also useful for handing off to another machine:
   `draft <id> <dir>` extracts to `<dir>` without installing).
+- **Handing the zip to a human on another machine?** The zip already contains double-click
+  installers — `Install-Mac.command` (macOS; first run: right-click → Open) and
+  `Install-Windows.bat` (Windows). Tell them to unzip and double-click the one for their OS;
+  it finds the drafts folder itself and opens the JianYing download page if it isn't installed.
+  Do NOT run those installers yourself — they pause for keyboard input (designed for humans);
+  `draft <id>` is the non-interactive equivalent for agents.
 - If JianYing complains about missing media on open: click 链接媒体 and point it at the
   `assets/` folder inside the draft.
 
