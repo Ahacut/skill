@@ -36,6 +36,22 @@ ${CLAUDE_SKILL_DIR}/scripts/ahacut.sh status   # verify + show credit balance
 | **Script + duration** | `generate-text <file\|-> <seconds>` | Plain narration text; the AI splits it into scenes and paces them to fit the total length |
 | **Audio (mp3/wav)** | `generate-audio <file> [seconds]` | A voiceover/clip — it's transcribed to subtitles, b-roll is generated, and your original audio is muxed back under the video |
 
+**Overlay mode**: add `--overlay` to any `generate-*` command to get a **transparent overlay
+track** instead of full-screen b-roll — a ProRes 4444 `.mov` with alpha, designed to sit **on
+top of talking-head footage** in any editor (lower-thirds, corner cards, term cards; large
+areas stay fully transparent so the speaker shows through). It is silent by design (the voice
+lives on the footage below) and the result URL is `.job.result.overlay` (a `.mov`).
+
+**⚠️ Palette: pin it whenever one film is submitted as more than one job.** The server picks
+the colour scheme by **hashing the script of that job** — so cutting a film into N jobs gives you
+N different colour schemes and the finished timeline looks like it was made by N people. Add
+`--palette <id>` to every job of the same film. Ids: `editorial-slate` / `red-alert` /
+`deep-teal` / `violet-night` / `amber-doc` / `cyan-steel` (run `limits` for the hex values).
+Omit it only when the whole film is a single job.
+
+**Style brief**: `--style-brief "<text>"` (≤500 chars) passes a style preference to the scene
+designer. It is a preference, not narration — it is never rendered as on-screen copy.
+
 Each `generate-*` returns a **job** (with an `id` and a `hold_credits` estimate). Generation runs
 async in the cloud — poll it with `wait <id>` (or `job <id>`), then read the result URLs.
 
@@ -43,17 +59,20 @@ async in the cloud — poll it with `wait <id>` (or `job <id>`), then read the r
 
 ```
 login <key> | logout | status | limits | list
-generate-srt <file.srt>
-generate-text <file|-> <seconds>
-generate-audio <file> [seconds]
+generate-srt <file.srt> [--overlay] [--palette <id>] [--style-brief <text>]
+generate-text <file|-> <seconds> [--overlay] [--palette <id>] [--style-brief <text>]
+generate-audio <file> [seconds] [--overlay] [--palette <id>] [--style-brief <text>]
 job <id>                    # status + result download URLs
 wait <id> [timeout=1800]    # poll until done/failed, prints the final job
-download <id> [out.mp4]     # save finished video LOCALLY, prints the local path
+download <id> [out]         # save finished video LOCALLY, prints the local path
+download <id> [out] --artifact=<name>   # other deliverables: jy_draft / scenes_zip / sfx_wav / sfx_cues / sfx_jianying
+draft <id> [dir] [--force]  # install the JianYing (剪映) draft into the local JianYing drafts folder
 ```
 
 All go through `${CLAUDE_SKILL_DIR}/scripts/ahacut.sh`. Output is JSON — read `.job.status`
 (`queued → authoring → render_ready → running → done|failed`) and, when `done`,
-`.job.result.with_audio` / `.job.result.broll` (signed download URLs) and `.job.charged_credits`.
+`.job.result.with_audio` / `.job.result.broll` (or `.job.result.overlay` for `--overlay` jobs;
+signed download URLs) and `.job.charged_credits`.
 
 ## Delivering the result (important)
 
@@ -70,6 +89,28 @@ LOCAL=$($S download <job_id>)     # saves the mp4 locally, prints its absolute p
 Prefer `.with_audio` (b-roll + the original voiceover) over `.broll` (visuals only) — `download`
 picks `.with_audio` automatically when present. Do **not** pass a remote URL to a delivery tool
 that expects a local file (that yields an empty/failed artifact).
+
+## JianYing (剪映) users: install the draft directly
+
+Every finished job also ships `.job.result.jy_draft` — a **ready-made JianYing draft**: each
+scene is a clean clip already placed at its exact timecode on the timeline. If the user edits
+in JianYing (剪映专业版) on THIS machine, skip the download-and-import dance entirely:
+
+```bash
+$S draft <job_id>       # downloads + installs into the local JianYing drafts folder
+```
+
+Then tell the user to open JianYing — the draft (named `ahacut_…`) is in the draft list with
+the timeline already laid out. Rules the command enforces (worth knowing):
+
+- **JianYing must be fully quit** during install — drafts written while it runs get flagged
+  as "corrupted" (they aren't; it's a race with JianYing's async takeover). The command aborts
+  with a clear message if it detects JianYing running; `--force` overrides.
+- If no local JianYing install is found, it extracts to the current directory and prints
+  where to move the folder manually (also useful for handing off to another machine:
+  `draft <id> <dir>` extracts to `<dir>` without installing).
+- If JianYing complains about missing media on open: click 链接媒体 and point it at the
+  `assets/` folder inside the draft.
 
 ## Workflow patterns
 
