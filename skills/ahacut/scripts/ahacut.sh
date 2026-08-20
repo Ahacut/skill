@@ -92,13 +92,14 @@ cmd_job() {
 
 # generate-text <file|-> <seconds> [--overlay]   (script + total length -> AI segments + paces)
 cmd_generate_text() {
-  local file="" secs="" overlay="" aspect=""
+  local file="" secs="" overlay="" aspect="" sfx=""
   local palette="" brief_txt="" want_palette=0 want_brief=0
   local ctx_txt=""
   local a
   for a in "$@"; do
     case "$a" in
       --overlay) overlay=',"overlay":true' ;;
+      --sfx) sfx=',"sfx":true' ;;
       --vertical|--portrait) aspect=',"aspect":"9:16"' ;;
       --palette=*) palette=",\"palette\":\"${a#--palette=}\"" ;;
       --palette) want_palette=1 ;;
@@ -111,7 +112,7 @@ cmd_generate_text() {
          elif [ -z "$file" ]; then file="$a"; elif [ -z "$secs" ]; then secs="$a"; fi ;;
     esac
   done
-  { [ -z "$file" ] || [ -z "$secs" ]; } && { echo "Usage: ahacut.sh generate-text <file|-> <seconds> [--overlay] [--vertical] [--context=<text>|--context-file=<path>]"; exit 1; }
+  { [ -z "$file" ] || [ -z "$secs" ]; } && { echo "Usage: ahacut.sh generate-text <file|-> <seconds> [--overlay] [--vertical] [--sfx] [--context=<text>|--context-file=<path>]"; exit 1; }
   local text; if [ "$file" = "-" ]; then text=$(cat); else text=$(cat "$file"); fi
   local tjson; tjson=$(printf '%s' "$text" | json_str)
   local brief=""
@@ -119,18 +120,19 @@ cmd_generate_text() {
   # 调用方上下文:agent 分批调用时,上游掌握整片而分幕器只看得见这一单 —— 把宏观视角带上去。
   local cctx=""
   [ -n "$ctx_txt" ] && cctx=",\"caller_context\":$(printf '%s' "$ctx_txt" | json_str)"
-  api POST /jobs -d "{\"input_kind\":\"text\",\"text\":${tjson},\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}${cctx}}"
+  api POST /jobs -d "{\"input_kind\":\"text\",\"text\":${tjson},\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}${cctx}${sfx}}"
 }
 
 # generate-srt <file> [--overlay] [--vertical]   (precise: cuts land on subtitle timings)
 cmd_generate_srt() {
-  local file="" overlay="" aspect=""
+  local file="" overlay="" aspect="" sfx=""
   local palette="" brief_txt="" want_palette=0 want_brief=0
   local ctx_txt=""
   local a
   for a in "$@"; do
     case "$a" in
       --overlay) overlay=',"overlay":true' ;;
+      --sfx) sfx=',"sfx":true' ;;
       --vertical|--portrait) aspect=',"aspect":"9:16"' ;;
       --palette=*) palette=",\"palette\":\"${a#--palette=}\"" ;;
       --palette) want_palette=1 ;;
@@ -143,25 +145,26 @@ cmd_generate_srt() {
          elif [ -z "$file" ]; then file="$a"; fi ;;
     esac
   done
-  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-srt <file.srt> [--overlay] [--vertical] [--context=<text>|--context-file=<path>]"; exit 1; }
+  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-srt <file.srt> [--overlay] [--vertical] [--sfx] [--context=<text>|--context-file=<path>]"; exit 1; }
   local sjson; sjson=$(cat "$file" | json_str)
   local brief=""
   [ -n "$brief_txt" ] && brief=",\"style_brief\":$(printf '%s' "$brief_txt" | json_str)"
   # 调用方上下文:agent 分批调用时,上游掌握整片而分幕器只看得见这一单 —— 把宏观视角带上去。
   local cctx=""
   [ -n "$ctx_txt" ] && cctx=",\"caller_context\":$(printf '%s' "$ctx_txt" | json_str)"
-  api POST /jobs -d "{\"input_kind\":\"srt\",\"srt\":${sjson}${overlay}${aspect}${palette}${brief}${cctx}}"
+  api POST /jobs -d "{\"input_kind\":\"srt\",\"srt\":${sjson}${overlay}${aspect}${palette}${brief}${cctx}${sfx}}"
 }
 
 # generate-audio <file> [seconds] [--overlay] [--vertical]   (mp3/wav -> speech-to-text -> b-roll, original audio muxed back)
 cmd_generate_audio() {
-  local file="" secs="" overlay="" aspect=""
+  local file="" secs="" overlay="" aspect="" sfx=""
   local palette="" brief_txt="" want_palette=0 want_brief=0
   local ctx_txt=""
   local a
   for a in "$@"; do
     case "$a" in
       --overlay) overlay=',"overlay":true' ;;
+      --sfx) sfx=',"sfx":true' ;;
       --vertical|--portrait) aspect=',"aspect":"9:16"' ;;
       --palette=*) palette=",\"palette\":\"${a#--palette=}\"" ;;
       --palette) want_palette=1 ;;
@@ -174,7 +177,7 @@ cmd_generate_audio() {
          elif [ -z "$file" ]; then file="$a"; elif [ -z "$secs" ]; then secs="$a"; fi ;;
     esac
   done
-  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-audio <file> [seconds] [--overlay] [--vertical] [--context=<text>|--context-file=<path>]"; exit 1; }
+  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-audio <file> [seconds] [--overlay] [--vertical] [--sfx] [--context=<text>|--context-file=<path>]"; exit 1; }
   [ -f "$file" ] || { echo "ERROR: file not found: $file"; exit 1; }
   local ext bytes; ext=$(echo "${file##*.}" | tr '[:upper:]' '[:lower:]')
   bytes=$(wc -c < "$file" | tr -d ' ')
@@ -196,7 +199,7 @@ cmd_generate_audio() {
   [ -n "$brief_txt" ] && brief=",\"style_brief\":$(printf '%s' "$brief_txt" | json_str)"
   local cctx=""
   [ -n "$ctx_txt" ] && cctx=",\"caller_context\":$(printf '%s' "$ctx_txt" | json_str)"
-  api POST /jobs -d "{\"input_kind\":\"audio\",\"audio_key\":\"${key}\",\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}${cctx}}"
+  api POST /jobs -d "{\"input_kind\":\"audio\",\"audio_key\":\"${key}\",\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}${cctx}${sfx}}"
 }
 
 # wait <job_id> [timeout_sec]   — poll until done/failed, then print the job
@@ -223,7 +226,7 @@ cmd_wait() {
 # download <job_id> [out] [--artifact=<name>]  — save a finished artifact to a LOCAL file
 # Many agent frameworks can only deliver a local file path, not a remote URL — use this
 # after the job is done, then hand the printed local path to your delivery step.
-# Default artifact: the final video (with_audio -> broll -> overlay). Other artifact
+# Default artifact: the final video (with_sfx -> with_audio -> broll -> overlay). Other artifact
 # names: jy_draft (JianYing draft zip), scenes_zip, sfx_wav, sfx_cues, sfx_jianying.
 cmd_download() {
   local id="" out="" artifact="" a
@@ -249,9 +252,11 @@ cmd_download() {
     esac
     [ -z "$url" ] && { echo "ERROR: artifact '${artifact}' not present on job $id" >&2; exit 1; }
   else
-    # prefer the final video with original audio; fall back to the b-roll track;
+    # prefer the SFX mix (only present when the job asked for --sfx and the stage
+    # succeeded), then the final video with original audio, then the b-roll track;
     # overlay jobs only have the transparent .mov track
-    url=$(printf '%s' "$res" | jget '.job.result.with_audio')
+    url=$(printf '%s' "$res" | jget '.job.result.with_sfx')
+    [ -z "$url" ] && url=$(printf '%s' "$res" | jget '.job.result.with_audio')
     [ -z "$url" ] && url=$(printf '%s' "$res" | jget '.job.result.broll')
     if [ -z "$url" ]; then
       url=$(printf '%s' "$res" | jget '.job.result.overlay'); ext="mov"
@@ -404,6 +409,11 @@ Generate (returns a job; poll with `wait`):
   --style-brief <text>             Style preference passed to the scene designer (<=500 chars).
                                    It is a preference, not narration — it never gets rendered
                                    as on-screen copy.
+  --sfx (any generate cmd)         Add a sound-effects pass (Beta, no extra credits): job also
+                                   yields with_sfx / sfx_wav / sfx_cues / sfx_jianying artifacts.
+                                   `download` then prefers the with_sfx mix automatically. The
+                                   stage is best-effort — if it fails the job still finishes,
+                                   just without the sfx artifacts.
   --vertical (any generate cmd)    9:16 vertical (1080x1920) instead of the 16:9 default.
                                    Nothing infers this from your footage — say it here or
                                    you get a landscape track that won't fit your timeline
@@ -412,7 +422,7 @@ Track & deliver:
   job <id>                         Job status + result URLs
   wait <id> [timeout]              Poll until done/failed (default 1800s)
   download <id> [out]              Save finished video LOCALLY, prints local path (for delivery)
-    [--artifact=<name>]            Other deliverables: jy_draft / scenes_zip / sfx_wav / sfx_cues / sfx_jianying
+    [--artifact=<name>]            Other deliverables: jy_draft / scenes_zip / with_sfx / sfx_wav / sfx_cues / sfx_jianying
   draft <id> [dir] [--force]       Install the JianYing (剪映) draft into the LOCAL JianYing
                                    drafts folder — reopen JianYing and every clip is already
                                    on the timeline at its exact timecode. Quit JianYing first.

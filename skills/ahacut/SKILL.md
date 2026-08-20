@@ -52,6 +52,12 @@ Omit it only when the whole film is a single job.
 **Style brief**: `--style-brief "<text>"` (≤500 chars) passes a style preference to the scene
 designer. It is a preference, not narration — it is never rendered as on-screen copy.
 
+**Sound effects**: `--sfx` (any generate cmd, Beta, no extra credits) adds a sound-design pass.
+The job then also yields `with_sfx` (the final video with the effects mixed in — `download`
+prefers it automatically) plus `sfx_wav` / `sfx_cues` / `sfx_jianying` artifacts. The stage is
+best-effort: if it fails the job still finishes, just without these artifacts — check for
+`.job.result.with_sfx` before assuming the download has sound.
+
 **Caller context** (agents: read this): `--context "<text>"` / `--context-file <path>`
 (≤2000 chars) hands the scene designer **your** view of the film.
 
@@ -83,13 +89,13 @@ async in the cloud — poll it with `wait <id>` (or `job <id>`), then read the r
 
 ```
 login <key> | logout | status | limits | list
-generate-srt <file.srt> [--overlay] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
-generate-text <file|-> <seconds> [--overlay] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
-generate-audio <file> [seconds] [--overlay] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
+generate-srt <file.srt> [--overlay] [--sfx] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
+generate-text <file|-> <seconds> [--overlay] [--sfx] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
+generate-audio <file> [seconds] [--overlay] [--sfx] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
 job <id>                    # status + result download URLs
 wait <id> [timeout=1800]    # poll until done/failed, prints the final job
 download <id> [out]         # save finished video LOCALLY, prints the local path
-download <id> [out] --artifact=<name>   # other deliverables: jy_draft / scenes_zip / sfx_wav / sfx_cues / sfx_jianying
+download <id> [out] --artifact=<name>   # other deliverables: jy_draft / scenes_zip / with_sfx / sfx_wav / sfx_cues / sfx_jianying
 draft <id> [dir] [--force]  # install the JianYing (剪映) draft into the local JianYing drafts folder
 ```
 
