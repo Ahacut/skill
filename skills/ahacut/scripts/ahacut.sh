@@ -94,6 +94,7 @@ cmd_job() {
 cmd_generate_text() {
   local file="" secs="" overlay="" aspect=""
   local palette="" brief_txt="" want_palette=0 want_brief=0
+  local ctx_txt=""
   local a
   for a in "$@"; do
     case "$a" in
@@ -102,24 +103,30 @@ cmd_generate_text() {
       --palette=*) palette=",\"palette\":\"${a#--palette=}\"" ;;
       --palette) want_palette=1 ;;
       --style-brief=*) brief_txt="${a#--style-brief=}" ;;
+      --context=*) ctx_txt="${a#--context=}" ;;
+      --context-file=*) ctx_txt=$(cat "${a#--context-file=}") ;;
       --style-brief) want_brief=1 ;;
       *) if [ "$want_palette" = 1 ]; then palette=",\"palette\":\"$a\""; want_palette=0;
          elif [ "$want_brief" = 1 ]; then brief_txt="$a"; want_brief=0;
          elif [ -z "$file" ]; then file="$a"; elif [ -z "$secs" ]; then secs="$a"; fi ;;
     esac
   done
-  { [ -z "$file" ] || [ -z "$secs" ]; } && { echo "Usage: ahacut.sh generate-text <file|-> <seconds> [--overlay] [--vertical]"; exit 1; }
+  { [ -z "$file" ] || [ -z "$secs" ]; } && { echo "Usage: ahacut.sh generate-text <file|-> <seconds> [--overlay] [--vertical] [--context=<text>|--context-file=<path>]"; exit 1; }
   local text; if [ "$file" = "-" ]; then text=$(cat); else text=$(cat "$file"); fi
   local tjson; tjson=$(printf '%s' "$text" | json_str)
   local brief=""
   [ -n "$brief_txt" ] && brief=",\"style_brief\":$(printf '%s' "$brief_txt" | json_str)"
-  api POST /jobs -d "{\"input_kind\":\"text\",\"text\":${tjson},\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}}"
+  # 调用方上下文:agent 分批调用时,上游掌握整片而分幕器只看得见这一单 —— 把宏观视角带上去。
+  local cctx=""
+  [ -n "$ctx_txt" ] && cctx=",\"caller_context\":$(printf '%s' "$ctx_txt" | json_str)"
+  api POST /jobs -d "{\"input_kind\":\"text\",\"text\":${tjson},\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}${cctx}}"
 }
 
 # generate-srt <file> [--overlay] [--vertical]   (precise: cuts land on subtitle timings)
 cmd_generate_srt() {
   local file="" overlay="" aspect=""
   local palette="" brief_txt="" want_palette=0 want_brief=0
+  local ctx_txt=""
   local a
   for a in "$@"; do
     case "$a" in
@@ -128,23 +135,29 @@ cmd_generate_srt() {
       --palette=*) palette=",\"palette\":\"${a#--palette=}\"" ;;
       --palette) want_palette=1 ;;
       --style-brief=*) brief_txt="${a#--style-brief=}" ;;
+      --context=*) ctx_txt="${a#--context=}" ;;
+      --context-file=*) ctx_txt=$(cat "${a#--context-file=}") ;;
       --style-brief) want_brief=1 ;;
       *) if [ "$want_palette" = 1 ]; then palette=",\"palette\":\"$a\""; want_palette=0;
          elif [ "$want_brief" = 1 ]; then brief_txt="$a"; want_brief=0;
          elif [ -z "$file" ]; then file="$a"; fi ;;
     esac
   done
-  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-srt <file.srt> [--overlay] [--vertical]"; exit 1; }
+  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-srt <file.srt> [--overlay] [--vertical] [--context=<text>|--context-file=<path>]"; exit 1; }
   local sjson; sjson=$(cat "$file" | json_str)
   local brief=""
   [ -n "$brief_txt" ] && brief=",\"style_brief\":$(printf '%s' "$brief_txt" | json_str)"
-  api POST /jobs -d "{\"input_kind\":\"srt\",\"srt\":${sjson}${overlay}${aspect}${palette}${brief}}"
+  # 调用方上下文:agent 分批调用时,上游掌握整片而分幕器只看得见这一单 —— 把宏观视角带上去。
+  local cctx=""
+  [ -n "$ctx_txt" ] && cctx=",\"caller_context\":$(printf '%s' "$ctx_txt" | json_str)"
+  api POST /jobs -d "{\"input_kind\":\"srt\",\"srt\":${sjson}${overlay}${aspect}${palette}${brief}${cctx}}"
 }
 
 # generate-audio <file> [seconds] [--overlay] [--vertical]   (mp3/wav -> speech-to-text -> b-roll, original audio muxed back)
 cmd_generate_audio() {
   local file="" secs="" overlay="" aspect=""
   local palette="" brief_txt="" want_palette=0 want_brief=0
+  local ctx_txt=""
   local a
   for a in "$@"; do
     case "$a" in
@@ -153,13 +166,15 @@ cmd_generate_audio() {
       --palette=*) palette=",\"palette\":\"${a#--palette=}\"" ;;
       --palette) want_palette=1 ;;
       --style-brief=*) brief_txt="${a#--style-brief=}" ;;
+      --context=*) ctx_txt="${a#--context=}" ;;
+      --context-file=*) ctx_txt=$(cat "${a#--context-file=}") ;;
       --style-brief) want_brief=1 ;;
       *) if [ "$want_palette" = 1 ]; then palette=",\"palette\":\"$a\""; want_palette=0;
          elif [ "$want_brief" = 1 ]; then brief_txt="$a"; want_brief=0;
          elif [ -z "$file" ]; then file="$a"; elif [ -z "$secs" ]; then secs="$a"; fi ;;
     esac
   done
-  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-audio <file> [seconds] [--overlay] [--vertical]"; exit 1; }
+  [ -z "$file" ] && { echo "Usage: ahacut.sh generate-audio <file> [seconds] [--overlay] [--vertical] [--context=<text>|--context-file=<path>]"; exit 1; }
   [ -f "$file" ] || { echo "ERROR: file not found: $file"; exit 1; }
   local ext bytes; ext=$(echo "${file##*.}" | tr '[:upper:]' '[:lower:]')
   bytes=$(wc -c < "$file" | tr -d ' ')
@@ -179,7 +194,9 @@ cmd_generate_audio() {
   curl -sS -X PUT -H "Content-Type: application/octet-stream" --upload-file "$file" "$url" >/dev/null
   local brief=""
   [ -n "$brief_txt" ] && brief=",\"style_brief\":$(printf '%s' "$brief_txt" | json_str)"
-  api POST /jobs -d "{\"input_kind\":\"audio\",\"audio_key\":\"${key}\",\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}}"
+  local cctx=""
+  [ -n "$ctx_txt" ] && cctx=",\"caller_context\":$(printf '%s' "$ctx_txt" | json_str)"
+  api POST /jobs -d "{\"input_kind\":\"audio\",\"audio_key\":\"${key}\",\"duration_seconds\":${secs}${overlay}${aspect}${palette}${brief}${cctx}}"
 }
 
 # wait <job_id> [timeout_sec]   — poll until done/failed, then print the job

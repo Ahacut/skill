@@ -52,6 +52,30 @@ Omit it only when the whole film is a single job.
 **Style brief**: `--style-brief "<text>"` (≤500 chars) passes a style preference to the scene
 designer. It is a preference, not narration — it is never rendered as on-screen copy.
 
+**Caller context** (agents: read this): `--context "<text>"` / `--context-file <path>`
+(≤2000 chars) hands the scene designer **your** view of the film.
+
+You only need it when you are **splitting one film into several jobs** — which is what agents do
+and web users never do. In that case each job arrives here as a few seconds of orphaned text: the
+designer cannot tell whether this beat is setup or payoff, what was said thirty seconds earlier,
+or what the neighbouring beats already look like. It ends up composing every job as if it were a
+standalone film, which is how you get the same big-type card over and over.
+
+You are the one holding that context, so pass it down. Useful things to put in it:
+
+- what the whole film argues, and where this job sits in that arc
+- what the surrounding material is doing (talking head? stock footage? a chart you already used?)
+- the visual direction you already decided for this stretch — **if you want a generated
+  photographic backdrop, say so here**; the designer honours it
+- anything that should not repeat, so consecutive jobs don't converge on one layout
+
+It is guidance, not narration — like `--style-brief`, it never appears on screen. Per-job (unlike
+`--palette`, which you keep identical across the film).
+
+```bash
+$S generate-srt beat_07.srt --palette deep-teal --context-file beat_07.context.md
+```
+
 Each `generate-*` returns a **job** (with an `id` and a `hold_credits` estimate). Generation runs
 async in the cloud — poll it with `wait <id>` (or `job <id>`), then read the result URLs.
 
@@ -59,9 +83,9 @@ async in the cloud — poll it with `wait <id>` (or `job <id>`), then read the r
 
 ```
 login <key> | logout | status | limits | list
-generate-srt <file.srt> [--overlay] [--palette <id>] [--style-brief <text>]
-generate-text <file|-> <seconds> [--overlay] [--palette <id>] [--style-brief <text>]
-generate-audio <file> [seconds] [--overlay] [--palette <id>] [--style-brief <text>]
+generate-srt <file.srt> [--overlay] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
+generate-text <file|-> <seconds> [--overlay] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
+generate-audio <file> [seconds] [--overlay] [--palette <id>] [--style-brief <text>] [--context <text>|--context-file <path>]
 job <id>                    # status + result download URLs
 wait <id> [timeout=1800]    # poll until done/failed, prints the final job
 download <id> [out]         # save finished video LOCALLY, prints the local path
